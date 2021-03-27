@@ -1,0 +1,143 @@
+
+import nltk
+nltk.download('punkt')
+from nltk.tokenize import sent_tokenize
+import json
+import pickle
+
+def parse_squad(dataset,dataset_type):
+    """
+    Parses SQUAD database into more readable format. In this case I only care
+    about question/answers pairs in order to make a seq2seq model that would
+    generate questions out of a paragraph.
+    
+    Inputs:
+        dataset: squad dataset in json format
+    Returns:
+        squad_json: parsed squad dataset in json format
+    """
+    total_topics = 0
+    total_questions = 0
+    squad_json = []
+    paragraph = 0
+    # Variables to control
+    no_of_paragraphs = 60
+    sentence_length = 5  # min = 1 && max = 29
+    # Iterate through every topic in the dataset
+    for topic in dataset:
+
+
+        total_topics += 1
+        
+        # Iterate through every text passage in the topic
+        for passage in topic['paragraphs']:
+          len_of_sent = len(sent_tokenize(passage['context']))
+
+
+
+          if len_of_sent == sentence_length:
+              if paragraph == no_of_paragraphs:
+                  break
+              paragraph += 1
+              # Iterate through every question/answer pairs in the passage
+              for qas in passage['qas']:
+                total_questions += 1
+                text_question_pair = {}
+                # Append the title
+                text_question_pair['topic'] = topic['title']
+                # Append the text paragraph
+
+
+                text_question_pair['paragraph'] = passage['context']
+
+                # Append the question
+                text_question_pair['question'] = qas['question']
+                # Iterate through available answers
+                answers = []
+                for answer in qas['answers']:
+                    answers.append(answer['text'])
+                # And append them all together
+                text_question_pair['answers'] = answers
+                # Append found dictionary to the full parsed dataset array
+                squad_json.append(text_question_pair)
+
+    # print("min sentences: ",min_sentences )
+    print(dataset_type+":")
+    # print("max sentences: ", max_sentences)
+    print('Found ' + str(paragraph) + ' Paragraph in total.')
+    # print('Found ' + str(total_topics) + ' topics in total.')
+    print('Found ' + str(total_questions) + ' questions in total.')
+    return squad_json
+
+#==============================================================================
+# # PARSE AND SAVE TRAIN DATA
+#==============================================================================
+squad_train_filepath = 'files/train-v2.0.json'
+save_path = 'files/parsed_train_data.json'
+
+# Load squad train dataset
+train_json = json.load(open(squad_train_filepath, 'r'))
+train_dataset = train_json['data']
+
+parsed_train_squad = parse_squad(train_dataset,"training dataset")
+json.dump(parsed_train_squad, open(save_path, 'w'))
+
+#==============================================================================
+# # PARSE AND SAVE DEV DATA
+#==============================================================================
+# Filepath to squad dataset and path where to save the parsed dataset  
+squad_dev_filepath = 'files/dev-v2.0.json'
+save_path = 'files/others/parsed_dev_data.json'
+
+# Load squad dev dataset
+dev_json = json.load(open(squad_dev_filepath, 'r'))
+dev_dataset = dev_json['data']
+
+parsed_dev_squad = parse_squad(dev_dataset,"testing dataset")
+json.dump(parsed_dev_squad, open(save_path, 'w'))
+
+#======================================================================
+# Extract paragraph/questions pairs from Stanford's QUAD database
+#======================================================================
+train_filepath = 'files/parsed_train_data.json'
+dev_filepath = 'files/others/parsed_dev_data.json'
+
+train_set = json.load(open(train_filepath, 'r'))
+dev_set = json.load(open(dev_filepath, 'r'))
+
+train_paragraphs = []
+train_questions = []
+train_title = []
+for section in train_set:
+    if section['topic'] not in train_title:
+      train_title.append(section['topic'])
+    train_paragraphs.append(section['paragraph'])
+    train_questions.append(section['question'])
+
+
+
+dev_paragraphs = []
+dev_questions = []
+dev_title = []
+for section in dev_set:
+    if section['topic'] not in dev_title:
+      dev_title.append(section['topic'])
+    dev_paragraphs.append(section['paragraph'])
+    dev_questions.append(section['question'])
+    
+assert len(train_paragraphs) == len(train_questions)
+assert len(dev_paragraphs) == len(dev_questions)
+
+#==============================================================================
+# # Pickle up the extracted lists of questions/anserws pairs
+#==============================================================================
+def save_pickle(data, filename):
+    """Saves the data into pickle format"""
+    save_documents = open('files/others/'+filename+'.pickle', 'wb')
+    pickle.dump(data, save_documents)
+    save_documents.close()
+    
+save_pickle(train_paragraphs, 'train_squad_paragraphs')
+save_pickle(train_questions, 'train_squad_questions')
+save_pickle(dev_paragraphs, 'dev_squad_paragraphs')
+save_pickle(dev_questions, 'dev_squad_questions')
